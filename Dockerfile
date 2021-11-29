@@ -1,12 +1,19 @@
 FROM openjdk:8-jre
 
 #################################################################
-# Install scanner requirement here. (nmap example here)
+#Masscan 1.3.0 install.
 
-#RUN apt update
-#RUN apt install -y alien
-#RUN wget https://nmap.org/dist/nmap-7.91-1.x86_64.rpm  -O /tmp/nmap-7.91-1.x86_64.rpm
-#RUN alien -i /tmp/nmap-7.91-1.x86_64.rpm
+RUN apt update
+RUN apt install -y make gcc libpcap-dev
+
+RUN mkdir /tmp/masscan_install
+WORKDIR /tmp/masscan_install
+RUN wget https://github.com/robertdavidgraham/masscan/archive/1.3.2.tar.gz
+RUN tar xvzf 1.3.2.tar.gz
+WORKDIR /tmp/masscan_install/masscan-1.3.2
+RUN make install
+RUN rm -rf /tmp/masscan_install
+WORKDIR /
 #################################################################
 
 #Copy the war.

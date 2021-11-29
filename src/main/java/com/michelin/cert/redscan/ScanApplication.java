@@ -16,13 +16,28 @@
 
 package com.michelin.cert.redscan;
 
+import com.michelin.cert.redscan.utils.models.Ip;
 import com.michelin.cert.redscan.utils.models.IpRange;
+import com.michelin.cert.redscan.utils.system.OsCommandExecutor;
+import com.michelin.cert.redscan.utils.system.StreamGobbler;
 
+
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.IOException;
+
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+import java.util.List;
+import java.util.Scanner;
+
 import org.apache.logging.log4j.LogManager;
+
+import org.jdom2.Document;
+import org.jdom2.Element;
+import org.jdom2.JDOMException;
+import org.jdom2.input.SAXBuilder;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -40,6 +55,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 public class ScanApplication {
 
   private final RabbitTemplate rabbitTemplate;
+  private String topTcpPorts;
 
   /**
    * Constructor to init rabbit template. Only required if pushing data to queues
@@ -48,6 +64,15 @@ public class ScanApplication {
    */
   public ScanApplication(RabbitTemplate rabbitTemplate) {
     this.rabbitTemplate = rabbitTemplate;
+
+    // Init the String from the worldlist file.
+    try {
+      File topTcpPortsFile = new File("/wordlists/nmap-ports-top1000.txt");
+      Scanner reader = new Scanner(topTcpPortsFile);
+      topTcpPorts = reader.nextLine();
+    } catch (FileNotFoundException ex) {
+      LogManager.getLogger(ScanApplication.class).error(String.format("Failed to init the tcp ports wordlist : %s", ex.getMessage()));
+    }
   }
 
   /**
@@ -69,9 +94,19 @@ public class ScanApplication {
     IpRange ipRange = new IpRange();
     try {
       ipRange.fromJson(message);
-      LogManager.getLogger(ScanApplication.class).info(String.format("Blah : %s", ipRange.getCidr()));
+      LogManager.getLogger(ScanApplication.class).info(String.format("Scan Ip Range : %s", ipRange.getCidr()));
 
-      //ToDo: Get all IPs from CIDR then scan.
+      List<String> ips = ipRange.toIpList();
+      for(String ip : ips){
+        if(ping(ip) || masscan(ip)){
+          LogManager.getLogger(ScanApplication.class).info(String.format("Ip (%s) reachable", ip));
+          Ip ipObj = new Ip(ip,ipRange.getCidr());
+          ipObj.create();
+          rabbitTemplate.convertAndSend(ipObj.getFanoutExchangeName(), "", ipObj.toJson());
+        } else {
+          LogManager.getLogger(ScanApplication.class).info(String.format("Ip (%s) not reachable", ip));
+        }
+      }
     } catch (Exception ex) {
       LogManager.getLogger(ScanApplication.class).error(String.format("General Exception : %s", ex.getMessage()));
     }
@@ -86,7 +121,47 @@ public class ScanApplication {
     } catch (UnknownHostException ex) {
       LogManager.getLogger(ScanApplication.class).error(String.format("Unkonwn Host Exception : %s", ex.getMessage()));
     } catch (IOException ex) {
-      LogManager.getLogger(ScanApplication.class).error(String.format("Oing IOException : %s", ex.getMessage()));
+      LogManager.getLogger(ScanApplication.class).error(String.format("Ping IOException : %s", ex.getMessage()));
+    }
+    return result;
+  }
+
+  private boolean masscan(String ip) {
+    boolean result = false;
+    File masscanOutputFile = null;
+    LogManager.getLogger(ScanApplication.class).info(String.format("Start Masscan : %s", ip));
+    try {
+      masscanOutputFile = File.createTempFile(String.format("masscan_%s_", ip), ".out");
+
+      // The default transmit rate is 100 packets/second.
+      // A scan transmits only two packets; 500 ports are scanned.
+      // => use a rate of 1000 packets/second
+      // (the scan will take longer than 1 second, since Masscan waits 10 seconds for potential TCP SYN+ACK packets)
+      // -oX       : XML output
+      String masscanCmd = String.format("masscan --rate 1000 -oX %s %s -p%s", masscanOutputFile.getAbsolutePath(), ip, topTcpPorts);
+
+      OsCommandExecutor osCommandExecutor = new OsCommandExecutor();
+      StreamGobbler streamGobbler = osCommandExecutor.execute(masscanCmd);
+
+      if (streamGobbler != null) {
+        LogManager.getLogger(ScanApplication.class).info(String.format("Masscan terminated with status : %d", streamGobbler.getExitStatus()));
+        if (masscanOutputFile.length() != 0) {
+          SAXBuilder builder = new SAXBuilder();
+          Document document = (Document) builder.build(masscanOutputFile);
+          List<Element> hostNodes = document.getRootElement().getChildren("host");
+          result = (hostNodes != null);
+        }
+      }
+    } catch (UnknownHostException ex) {
+      LogManager.getLogger(ScanApplication.class).error(String.format("IP not found : %s", ip));
+    } catch (IOException ex) {
+      LogManager.getLogger(ScanApplication.class).error(String.format("IOException : %s", ex.getMessage()));
+    } catch (JDOMException ex) {
+      LogManager.getLogger(ScanApplication.class).error(String.format("JDOM Exception : %s", ex.getMessage()));
+    } finally {
+      if (masscanOutputFile != null) {
+        masscanOutputFile.delete();
+      }
     }
     return result;
   }

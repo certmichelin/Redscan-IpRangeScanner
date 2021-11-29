@@ -15,6 +15,7 @@
     
         <!-- Define dependencies versions -->
         <redscan-utils.version>4.1.0-SNAPSHOT</redscan-utils.version>
+        <jdom.version>2.0.6</jdom.version>
 
         <!-- Define test dependencies versions -->
         
@@ -28,7 +29,7 @@
         <version>2.5.5</version>
     </parent>
          
-     <!-- Manage repository for REDSCAN UTILS -->
+    <!-- Manage repository for REDSCAN UTILS -->
     <repositories>
         <repository>
             <id>redscan-utils</id>
@@ -85,7 +86,11 @@
         <!-- End of dependencies for logging -->
         
         <!-- Custom dependencies -->
-        
+        <dependency>
+            <groupId>org.jdom</groupId>
+            <artifactId>jdom2</artifactId>
+            <version>${jdom.version}</version>
+        </dependency>
         <!-- End of Custom dependencies -->
     </dependencies>
 
