@@ -16,7 +16,7 @@
 
 package com.michelin.cert.redscan;
 
-import com.michelin.cert.redscan.utils.models.Domain;
+import com.michelin.cert.redscan.utils.models.IpRange;
 
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.Declarables;
@@ -35,11 +35,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMqConfig {
 
-  //TODO: Configure interaction.
   /**
-   * QUEUE_DOMAINS.
+   * QUEUE_IPRANGES.
    */
-  public static final String QUEUE_DOMAINS = "com.michelin.cert.XXXX.domains";
+  public static final String QUEUE_IPRANGES = "com.michelin.cert.iprangescanner.ipranges";
 
   /**
    * Queue configuration method.
@@ -48,8 +47,8 @@ public class RabbitMqConfig {
    */
   @Bean
   public Declarables fanoutBindings() {
-    Queue queue = new Queue(QUEUE_DOMAINS, false);
-    FanoutExchange fanoutExchange = new FanoutExchange(new Domain().getFanoutExchangeName(), false, false);
+    Queue queue = new Queue(QUEUE_IPRANGES, false);
+    FanoutExchange fanoutExchange = new FanoutExchange(new IpRange().getFanoutExchangeName(), false, false);
     return new Declarables(queue, fanoutExchange, BindingBuilder.bind(queue).to(fanoutExchange));
   }
 }

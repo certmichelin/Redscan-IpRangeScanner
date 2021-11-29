@@ -16,11 +16,16 @@
 
 package com.michelin.cert.redscan;
 
+import com.michelin.cert.redscan.utils.models.IpRange;
+
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 import org.apache.logging.log4j.LogManager;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
@@ -34,12 +39,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class ScanApplication {
 
-  // Only required if pushing data to queues
   private final RabbitTemplate rabbitTemplate;
-
-  // Only required if the worker need to cache result.
-  @Autowired
-  private CacheConfig cacheConfig;
 
   /**
    * Constructor to init rabbit template. Only required if pushing data to queues
@@ -64,13 +64,30 @@ public class ScanApplication {
    *
    * @param message Message received.
    */
-  @RabbitListener(queues = {RabbitMqConfig.QUEUE_DOMAINS})
+  @RabbitListener(queues = {RabbitMqConfig.QUEUE_IPRANGES})
   public void receiveMessage(String message) {
+    IpRange ipRange = new IpRange();
     try {
-      LogManager.getLogger(ScanApplication.class).info(String.format("Blah : %s", message));
+      ipRange.fromJson(message);
+      LogManager.getLogger(ScanApplication.class).info(String.format("Blah : %s", ipRange.getCidr()));
+
+      //ToDo: Get all IPs from CIDR then scan.
     } catch (Exception ex) {
       LogManager.getLogger(ScanApplication.class).error(String.format("General Exception : %s", ex.getMessage()));
     }
   }
 
+  private boolean ping(String ip) {
+    LogManager.getLogger(ScanApplication.class).info(String.format("Sending ping request to : %s", ip));
+    boolean result = false;
+    try {
+      InetAddress inet = InetAddress.getByName(ip);
+      result = inet.isReachable(5000);
+    } catch (UnknownHostException ex) {
+      LogManager.getLogger(ScanApplication.class).error(String.format("Unkonwn Host Exception : %s", ex.getMessage()));
+    } catch (IOException ex) {
+      LogManager.getLogger(ScanApplication.class).error(String.format("Oing IOException : %s", ex.getMessage()));
+    }
+    return result;
+  }
 }
