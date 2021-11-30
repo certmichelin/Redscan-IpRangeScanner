@@ -117,7 +117,7 @@ public class ScanApplication {
     boolean result = false;
     try {
       InetAddress inet = InetAddress.getByName(ip);
-      result = inet.isReachable(5000);
+      result = inet.isReachable(3000);
     } catch (UnknownHostException ex) {
       LogManager.getLogger(ScanApplication.class).error(String.format("Unkonwn Host Exception : %s", ex.getMessage()));
     } catch (IOException ex) {
