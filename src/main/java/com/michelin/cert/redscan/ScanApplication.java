@@ -21,7 +21,6 @@ import com.michelin.cert.redscan.utils.models.IpRange;
 import com.michelin.cert.redscan.utils.system.OsCommandExecutor;
 import com.michelin.cert.redscan.utils.system.StreamGobbler;
 
-
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -97,10 +96,10 @@ public class ScanApplication {
       LogManager.getLogger(ScanApplication.class).info(String.format("Scan Ip Range : %s", ipRange.getCidr()));
 
       List<String> ips = ipRange.toIpList();
-      for(String ip : ips){
-        if(ping(ip) || masscan(ip)){
+      for (String ip : ips) {
+        if (ping(ip) || masscan(ip)) {
           LogManager.getLogger(ScanApplication.class).info(String.format("Ip (%s) reachable", ip));
-          Ip ipObj = new Ip(ip,ipRange.getCidr());
+          Ip ipObj = new Ip(ip, ipRange.getCidr());
           ipObj.create();
           rabbitTemplate.convertAndSend(ipObj.getFanoutExchangeName(), "", ipObj.toJson());
         } else {
