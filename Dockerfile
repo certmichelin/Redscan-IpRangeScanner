@@ -1,16 +1,15 @@
 FROM openjdk:8-jre
 
 #################################################################
-#Masscan 1.3.0 install.
+#Masscan install.
 
 RUN apt update
-RUN apt install -y make gcc libpcap-dev
+RUN apt install -y make gcc libpcap-dev git
 
 RUN mkdir /tmp/masscan_install
 WORKDIR /tmp/masscan_install
-RUN wget https://github.com/robertdavidgraham/masscan/archive/1.3.2.tar.gz
-RUN tar xvzf 1.3.2.tar.gz
-WORKDIR /tmp/masscan_install/masscan-1.3.2
+RUN git clone https://github.com/robertdavidgraham/masscan.git
+WORKDIR /tmp/masscan_install/masscan
 RUN make install
 RUN rm -rf /tmp/masscan_install
 WORKDIR /

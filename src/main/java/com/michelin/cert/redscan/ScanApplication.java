@@ -21,8 +21,10 @@ import com.michelin.cert.redscan.utils.models.IpRange;
 import com.michelin.cert.redscan.utils.system.OsCommandExecutor;
 import com.michelin.cert.redscan.utils.system.StreamGobbler;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 
 import java.net.InetAddress;
@@ -33,10 +35,6 @@ import java.util.Scanner;
 
 import org.apache.logging.log4j.LogManager;
 
-import org.jdom2.Document;
-import org.jdom2.Element;
-import org.jdom2.JDOMException;
-import org.jdom2.input.SAXBuilder;
 
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -136,8 +134,8 @@ public class ScanApplication {
       // A scan transmits only two packets; 500 ports are scanned.
       // => use a rate of 1000 packets/second
       // (the scan will take longer than 1 second, since Masscan waits 10 seconds for potential TCP SYN+ACK packets)
-      // -oX       : XML output
-      String masscanCmd = String.format("masscan --rate 1000 -oX %s %s -p%s", masscanOutputFile.getAbsolutePath(), ip, topTcpPorts);
+      // -oL       : list output
+      String masscanCmd = String.format("masscan --rate 1000 -oL %s %s -p%s", masscanOutputFile.getAbsolutePath(), ip, topTcpPorts);
 
       OsCommandExecutor osCommandExecutor = new OsCommandExecutor();
       StreamGobbler streamGobbler = osCommandExecutor.execute(masscanCmd);
@@ -145,18 +143,20 @@ public class ScanApplication {
       if (streamGobbler != null) {
         LogManager.getLogger(ScanApplication.class).info(String.format("Masscan terminated with status : %d", streamGobbler.getExitStatus()));
         if (masscanOutputFile.length() != 0) {
-          SAXBuilder builder = new SAXBuilder();
-          Document document = (Document) builder.build(masscanOutputFile);
-          List<Element> hostNodes = document.getRootElement().getChildren("host");
-          result = (hostNodes != null);
+          try ( BufferedReader br = new BufferedReader(new FileReader(masscanOutputFile))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+              if (line.startsWith("open")) {
+                result = true;
+              }
+            }
+          }
         }
       }
     } catch (UnknownHostException ex) {
       LogManager.getLogger(ScanApplication.class).error(String.format("IP not found : %s", ip));
     } catch (IOException ex) {
       LogManager.getLogger(ScanApplication.class).error(String.format("IOException : %s", ex.getMessage()));
-    } catch (JDOMException ex) {
-      LogManager.getLogger(ScanApplication.class).error(String.format("JDOM Exception : %s", ex.getMessage()));
     } finally {
       if (masscanOutputFile != null) {
         masscanOutputFile.delete();
